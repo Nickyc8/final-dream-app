@@ -127,6 +127,15 @@ class DreamAnalyzer:
         xy = self.umap_2d.transform(vec)
         return {"x": float(xy[0, 0]), "y": float(xy[0, 1])}
 
+    def _point_3d(self, vec: np.ndarray) -> dict[str, float]:
+        xy_2d = self.umap_2d.transform(vec)
+        xy_10d = self.umap_10d.transform(vec)
+        return {
+            "x": float(xy_2d[0, 0]),
+            "y": float(xy_2d[0, 1]),
+            "z": float(xy_10d[0, 2]),
+        }
+
     def _emotions(self, text: str) -> dict[str, float]:
         results = self.emotion_model(text[:512])[0]
         return {r["label"]: float(r["score"]) for r in results}
@@ -161,13 +170,17 @@ class DreamAnalyzer:
         vec_10d = self.umap_10d.transform(vec)
         cluster_id, archetype = self._archetype(vec_10d)
         point = self._point_2d(vec)
+        plot_point_3d = self._point_3d(vec)
         emotions = self._emotions(text)
         similar = self._similar(vec, k=k_similar)
 
-        return AnalyzeResult(
+        # preserve original analysis fields, plus 3D plotting info
+        result = AnalyzeResult(
             archetype=archetype,
             cluster_id=cluster_id,
             emotions=emotions,
             point=point,
             similar=similar,
         ).to_dict()
+        result["plot_point_3d"] = plot_point_3d
+        return result

@@ -14,6 +14,7 @@ export default function AnalyzePage() {
     cluster: number;
     confidence: number;
     archetype_name: string;
+    emotions: Record<string, number>;
     emotion?: {
       label: string;
       confidence: number;
@@ -89,6 +90,11 @@ export default function AnalyzePage() {
     ? Math.round(result.emotion.confidence * 100)
     : 0;
 
+  function formatPercent(value: number) {
+    const numeric = value <= 1 ? value * 100 : value;
+    return `${Math.round(numeric)}%`;
+  }
+
   return (
     <main className="dream-shell">
       <div className="dream-aurora" aria-hidden="true">
@@ -139,6 +145,23 @@ export default function AnalyzePage() {
                 ? ` (${emotionConfidencePercent}% signal strength).`
                 : "."}
             </p>
+
+            {result.emotions && (
+              <>
+                <p className="dream-result-label">Emotion distribution</p>
+                <div className="dream-result-copy">
+                  <ul>
+                    {Object.entries(result.emotions)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([label, value]) => (
+                        <li key={label}>
+                          <strong>{label}</strong>: {formatPercent(value)}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              </>
+            )}
 
             {result.emotion?.signals && result.emotion.signals.length > 0 && (
               <>

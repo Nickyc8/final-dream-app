@@ -253,8 +253,8 @@ const EMOTION_LEXICON: Record<string, string[]> = {
 };
 
 const MAX_POINTS_BY_FOCUS: Record<FocusMode, number> = {
-  matched: 900,
-  all: 650,
+  matched: 320,
+  all: 240,
 };
 
 function focusLabel(focus: FocusMode) {
@@ -631,7 +631,7 @@ export default function Home() {
     if (latestDream) {
       const timer = window.setTimeout(() => {
         setFocusMode("matched");
-        setEmotionFilter("matched");
+        setEmotionFilter("mix");
       }, 0);
 
       return () => {
@@ -639,18 +639,6 @@ export default function Home() {
       };
     }
   }, [latestDream]);
-
-  useEffect(() => {
-    function syncFullscreenState() {
-      setIsUniverseFullscreen(document.fullscreenElement === universeFrameRef.current);
-    }
-
-    document.addEventListener("fullscreenchange", syncFullscreenState);
-
-    return () => {
-      document.removeEventListener("fullscreenchange", syncFullscreenState);
-    };
-  }, []);
 
   const { points, latest } = useMemo(
     () => normalizeUniversePoints(rawPoints, latestDream),
@@ -691,6 +679,13 @@ export default function Home() {
 
     return points.filter((point) => pointMatchesFocus(point, focusMode)).length;
   }, [emotionFilter, focusMode, latest, points]);
+
+  useEffect(() => {
+    if (focusMode === "matched" && latest && visibleTotal === 0 && emotionFilter !== "mix") {
+      setEmotionFilter("mix");
+    }
+  }, [focusMode, latest, visibleTotal, emotionFilter]);
+
   const matchedClusterSummary = useMemo(
     () => buildMatchedClusterSummary(points, latest),
     [points, latest]

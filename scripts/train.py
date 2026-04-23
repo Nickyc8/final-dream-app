@@ -150,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--data",
         type=Path,
-        default=Path(__file__).resolve().parents[2] / "Data" / "dreamsearch.csv",
+        default=Path(__file__).resolve().parents[1] / "Data" / "dreamsearch.csv",
         help="Path to dreamsearch.csv (default: ../Data/dreamsearch.csv)",
     )
     parser.add_argument(

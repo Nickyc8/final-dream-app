@@ -50,6 +50,12 @@ class PointOut(BaseModel):
     y: float
 
 
+class PointOut3D(BaseModel):
+    x: float
+    y: float
+    z: float
+
+
 class SimilarOut(BaseModel):
     text: str
     archetype: str
@@ -63,6 +69,10 @@ class AnalyzeOut(BaseModel):
     emotions: dict[str, float]
     point: PointOut
     similar: list[SimilarOut]
+    plot_point_3d: PointOut3D | None = None
+    cluster: int | None = None
+    archetype_name: str | None = None
+    emotion: dict[str, Any] | None = None
 
 
 state: dict[str, Any] = {"analyzer": None}
@@ -108,11 +118,54 @@ def health() -> dict[str, Any]:
     return {"ok": True, "model_loaded": state.get("analyzer") is not None}
 
 
-@app.post("/analyze", response_model=AnalyzeOut)
+@app.get("/plot-data-3d")
+def plot_data_3d() -> list[dict[str, Any]]:
+    analyzer = _get_analyzer()
+    if analyzer.corpus_meta is None or analyzer.corpus_embeddings is None:
+        raise HTTPException(status_code=503, detail="corpus data not loaded")
+    
+    try:
+        xy_2d = analyzer.umap_2d.transform(analyzer.corpus_embeddings)
+        xy_10d = analyzer.umap_10d.transform(analyzer.corpus_embeddings)
+        
+        points = []
+        for idx, row in analyzer.corpus_meta.iterrows():
+            cluster_id = int(row.get("cluster_embed", -1))
+            archetype_name = analyzer.archetype_names.get(cluster_id, "Unknown")
+            
+            points.append({
+                "x3": float(xy_2d[idx, 0]),
+                "y3": float(xy_2d[idx, 1]),
+                "z3": float(xy_10d[idx, 2]),
+                "cluster_embed": cluster_id,
+                "archetype_name": archetype_name,
+                "hover_text": str(row.get("text", ""))[:100],  # First 100 chars of dream text
+            })
+        
+        return points
+    except Exception as e:
+        log.exception("plot_data_3d failed")
+        raise HTTPException(status_code=500, detail=f"failed to generate plot data: {e}") from e
+
+
+@app.post("/analyze")
 def analyze(body: DreamIn) -> dict[str, Any]:
     analyzer = _get_analyzer()
     try:
-        return analyzer.analyze(body.text, k_similar=body.k_similar)
+        result = analyzer.analyze(body.text, k_similar=body.k_similar)
+        label = "Mixed / reflective"
+        confidence = 0.0
+        if isinstance(result.get("emotions"), dict) and result["emotions"]:
+            label, confidence = max(result["emotions"].items(), key=lambda item: item[1])
+        result["cluster"] = result.get("cluster_id", -1)
+        result["archetype_name"] = result.get("archetype", "Unknown")
+        result["emotion"] = {
+            "label": label,
+            "confidence": float(confidence),
+            "signals": [label],
+        }
+        result["plot_point_2d"] = result.get("point")
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

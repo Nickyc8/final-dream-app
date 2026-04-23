@@ -1,3 +1,5 @@
+import { Request } from "next/server";
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -10,12 +12,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = await fetch("http://127.0.0.1:8000/predict", {
+    const response = await fetch("http://127.0.0.1:8000/analyze", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ dreamText }),
+      body: JSON.stringify({ text: dreamText }),
     });
 
     const data = await response.json();
