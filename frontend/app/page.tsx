@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   type CSSProperties,
   type PointerEvent,
+  type WheelEvent,
   useEffect,
   useMemo,
   useRef,
@@ -288,6 +289,10 @@ const MAX_POINTS_BY_FOCUS: Record<FocusMode, number> = {
   all: 240,
 };
 
+const MIN_UNIVERSE_ZOOM = 0.65;
+const MAX_UNIVERSE_ZOOM = 1.85;
+const UNIVERSE_ZOOM_SENSITIVITY = 0.0016;
+
 function focusLabel(focus: FocusMode) {
   switch (focus) {
     case "matched":
@@ -352,6 +357,10 @@ function samplePoints(points: UniversePoint[], maxPoints: number) {
 
 function clampRotationX(value: number) {
   return Math.max(12, Math.min(82, value));
+}
+
+function clampUniverseZoom(value: number) {
+  return Math.max(MIN_UNIVERSE_ZOOM, Math.min(MAX_UNIVERSE_ZOOM, value));
 }
 
 function rotatePlanarPosition(x: number, y: number, rotationDegrees: number) {
@@ -594,6 +603,7 @@ export default function Home() {
   const [emotionFilter, setEmotionFilter] = useState<EmotionFilter>("matched");
   const [isUniverseFullscreen, setIsUniverseFullscreen] = useState(false);
   const [rotation, setRotation] = useState({ x: 58, y: 0, z: -34 });
+  const [zoom, setZoom] = useState(1);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(pipelineSteps[0].title);
@@ -774,6 +784,14 @@ export default function Home() {
     if (dragState?.pointerId === event.pointerId) {
       setDragState(null);
     }
+  }
+
+  function handleUniverseWheel(event: WheelEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+    setZoom((current) =>
+      clampUniverseZoom(current - delta * UNIVERSE_ZOOM_SENSITIVITY)
+    );
   }
 
   async function handleUniverseFullscreenToggle() {
@@ -1015,6 +1033,7 @@ export default function Home() {
                 onPointerMove={handleUniversePointerMove}
                 onPointerUp={handleUniversePointerUp}
                 onPointerCancel={handleUniversePointerUp}
+                onWheel={handleUniverseWheel}
               >
                 <div
                   className="universe-space"
@@ -1023,6 +1042,7 @@ export default function Home() {
                       "--rotate-x": `${rotation.x}deg`,
                       "--rotate-y": `${rotation.y}deg`,
                       "--rotate-z": "0deg",
+                      "--zoom": zoom,
                     } as CSSProperties
                   }
                 >
@@ -1200,8 +1220,9 @@ export default function Home() {
             </div>
 
             <p className="viz-footnote">
-              Drag the universe to rotate the real 3D backend projection. Labels mark
-              the visible clusters; click any point to inspect an example dream.
+              Drag the universe to rotate the real 3D backend projection, scroll to
+              zoom. Labels mark the visible clusters; click any point to inspect an
+              example dream.
             </p>
           </article>
 

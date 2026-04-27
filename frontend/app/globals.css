@@ -456,8 +456,10 @@ body {
 .universe-space {
   position: absolute;
   inset: 0;
+  transform-origin: 50% 50%;
   transform-style: preserve-3d;
   transform:
+    scale(var(--zoom, 1))
     rotateX(var(--rotate-x))
     rotateZ(var(--rotate-z))
     rotateY(var(--rotate-y));
