@@ -69,6 +69,7 @@ type DragState = {
 };
 
 type StoryTheme = "emotions" | "mental-health" | "therapy";
+type FutureWorkTheme = "archetypes" | "deployment" | "database" | "visualizations";
 
 const stats = [
   { label: "Dream reports", value: "~44,000" },
@@ -123,6 +124,36 @@ const impactContent: Record<
   therapy: {
     title: "Psychotherapeutic Support",
     body: "Archetype-level context can help clinicians interpret patient dream narratives against empirically grounded thematic structures.",
+  },
+};
+
+const futureWorksContent: Record<
+  FutureWorkTheme,
+  {
+    tab: string;
+    title: string;
+    body: string;
+  }
+> = {
+  archetypes: {
+    tab: "Archetype Standards",
+    title: "Stronger Archetype Standards and Richer Cluster Labels",
+    body: "Establish clearer naming criteria and validation guidelines so each cluster is easier to interpret, compare, and reuse in downstream studies.",
+  },
+  deployment: {
+    tab: "Deployment",
+    title: "Full-Scale Website Deployment",
+    body: "Move from demo mode to a production-ready release with hardened API routes, monitoring, and deployment infrastructure that can support larger traffic.",
+  },
+  database: {
+    tab: "Dream Database",
+    title: "Persistent Dream Storage",
+    body: "Save user-submitted dreams and analysis results to a database so users can revisit prior insights and track longitudinal dream trends over time.",
+  },
+  visualizations: {
+    tab: "Visualizations",
+    title: "More Interactive Visualizations",
+    body: "Expand the current visual layer with richer filtering, timeline exploration, and drill-down interactions that make the dream universe more exploratory and intuitive.",
   },
 };
 
@@ -567,6 +598,7 @@ export default function Home() {
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(pipelineSteps[0].title);
   const [activeTheme, setActiveTheme] = useState<StoryTheme>("emotions");
+  const [activeFutureWork, setActiveFutureWork] = useState<FutureWorkTheme>("archetypes");
   const [rawPoints, setRawPoints] = useState<RawUniversePoint[]>([]);
   const [latestDream, setLatestDream] = useState<LatestDreamPoint | null>(null);
   const [universeStatus, setUniverseStatus] = useState<"loading" | "ready" | "error">(
@@ -1221,6 +1253,48 @@ export default function Home() {
               </div>
               <p className="impact-title">{impactContent[activeTheme].title}</p>
               <p>{impactContent[activeTheme].body}</p>
+            </div>
+
+            <div className="future-panel">
+              <h3>Future Works</h3>
+              <div className="impact-tabs">
+                <button
+                  className={
+                    activeFutureWork === "archetypes" ? "impact-tab active" : "impact-tab"
+                  }
+                  onClick={() => setActiveFutureWork("archetypes")}
+                >
+                  {futureWorksContent.archetypes.tab}
+                </button>
+                <button
+                  className={
+                    activeFutureWork === "deployment" ? "impact-tab active" : "impact-tab"
+                  }
+                  onClick={() => setActiveFutureWork("deployment")}
+                >
+                  {futureWorksContent.deployment.tab}
+                </button>
+                <button
+                  className={
+                    activeFutureWork === "database" ? "impact-tab active" : "impact-tab"
+                  }
+                  onClick={() => setActiveFutureWork("database")}
+                >
+                  {futureWorksContent.database.tab}
+                </button>
+                <button
+                  className={
+                    activeFutureWork === "visualizations"
+                      ? "impact-tab active"
+                      : "impact-tab"
+                  }
+                  onClick={() => setActiveFutureWork("visualizations")}
+                >
+                  {futureWorksContent.visualizations.tab}
+                </button>
+              </div>
+              <p className="impact-title">{futureWorksContent[activeFutureWork].title}</p>
+              <p>{futureWorksContent[activeFutureWork].body}</p>
             </div>
           </article>
         </section>

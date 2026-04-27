@@ -285,6 +285,7 @@ body {
 .pipeline-card > p,
 .pipeline-detail p,
 .impact-panel p,
+.future-panel p,
 .home-bottom-cta p,
 .viz-footnote {
   margin: 0.5rem 0 0;
@@ -786,7 +787,8 @@ body {
 }
 
 .pipeline-detail h3,
-.impact-panel h3 {
+.impact-panel h3,
+.future-panel h3 {
   margin: 0;
   font-size: 1rem;
 }
@@ -828,6 +830,14 @@ body {
   font-family: var(--font-accent), var(--font-main), sans-serif;
   letter-spacing: -0.01em;
   color: #f6eaff;
+}
+
+.future-panel {
+  margin-top: 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 3, 26, 0.64);
+  padding: 0.82rem;
 }
 
 .home-bottom-cta {
