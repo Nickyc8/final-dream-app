@@ -20,6 +20,7 @@ from dreamcatcher.artifacts import (
     save_pickle,
 )
 from dreamcatcher.preprocess import clean_text
+from scripts.name_clusters import build_cluster_names
 
 
 logging.basicConfig(
@@ -194,11 +195,11 @@ def main(argv: list[str] | None = None) -> int:
     save_pickle(umap_10d, paths.umap_10d)
     save_pickle(umap_2d_reducer, paths.umap_2d)
     save_pickle(clusterer, paths.hdbscan)
-    save_json({str(k): v for k, v in ARCHETYPE_NAMES.items()}, paths.archetype_names)
     save_npy(embeddings.astype(np.float32), paths.corpus_embeddings)
     df_model[
         ["dream_id", "text", "clean_text", "cluster_embed", "x", "y"]
     ].to_parquet(paths.corpus_meta, index=False)
+    save_json(build_cluster_names(paths.corpus_meta), paths.archetype_names)
     save_json(
         {
             "embed_model": EMBED_MODEL_NAME,

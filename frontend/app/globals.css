@@ -581,28 +581,6 @@ body {
   background: var(--point-color);
 }
 
-.universe-cluster-label {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  max-width: 150px;
-  border-left: 3px solid var(--label-color);
-  background: rgba(6, 3, 18, 0.78);
-  color: #f7f0ff;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.25;
-  padding: 0.32rem 0.42rem;
-  pointer-events: none;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
-  transform:
-    translate3d(var(--label-x), var(--label-y), var(--label-z))
-    translate(8px, -50%)
-    rotateY(calc(-1 * var(--rotate-y)))
-    rotateZ(calc(-1 * var(--rotate-z)))
-    rotateX(calc(-1 * var(--rotate-x)));
-}
-
 .universe-status {
   margin: 0.58rem 0 0;
   color: #decaff;
@@ -1206,11 +1184,6 @@ body {
   .universe-plane {
     width: 320px;
     height: 320px;
-  }
-
-  .universe-cluster-label {
-    max-width: 116px;
-    font-size: 0.66rem;
   }
 
   .dream-card {

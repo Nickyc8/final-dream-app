@@ -52,15 +52,6 @@ type LegendItem = {
   color: string;
 };
 
-type ClusterLabel = {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  z: number;
-  color: string;
-};
-
 type DragState = {
   pointerId: number;
   startX: number;
@@ -285,13 +276,32 @@ const EMOTION_LEXICON: Record<string, string[]> = {
 };
 
 const MAX_POINTS_BY_FOCUS: Record<FocusMode, number> = {
-  matched: 320,
-  all: 240,
+  matched: 640,
+  all: 1200,
 };
 
 const MIN_UNIVERSE_ZOOM = 0.65;
 const MAX_UNIVERSE_ZOOM = 1.85;
 const UNIVERSE_ZOOM_SENSITIVITY = 0.0016;
+
+const CLUSTER_COLORS = [
+  "#93f2e7",
+  "#fff2a8",
+  "#fb7185",
+  "#86efac",
+  "#c4b5fd",
+  "#f5d0fe",
+  "#fca5a5",
+  "#7dd3fc",
+  "#fde68a",
+  "#bef264",
+  "#f9a8d4",
+  "#a7f3d0",
+  "#fdba74",
+  "#d8b4fe",
+  "#67e8f9",
+  "#f0abfc",
+];
 
 function focusLabel(focus: FocusMode) {
   switch (focus) {
@@ -306,7 +316,7 @@ function focusLabel(focus: FocusMode) {
 
 function viewDescription(view: ViewMode) {
   if (view === "clusters") {
-    return "Colors show the dominant emotion assigned to each dream.";
+    return "Colors show model-discovered semantic clusters.";
   }
 
   return "Colors emphasize how far a dream sits from the center of the projection.";
@@ -378,6 +388,15 @@ function rotatePlanarPosition(x: number, y: number, rotationDegrees: number) {
 
 function emotionColor(emotion: string) {
   return EMOTION_COLORS[emotion] ?? EMOTION_COLORS["Mixed / reflective"];
+}
+
+function clusterColor(cluster: number) {
+  if (cluster === -1) {
+    return "#65517f";
+  }
+
+  const index = Math.abs(cluster * 37) % CLUSTER_COLORS.length;
+  return CLUSTER_COLORS[index];
 }
 
 function inferEmotionLabel(text: string, archetypeName: string) {
@@ -472,7 +491,7 @@ function normalizeUniversePoints(
 
 function pointColor(point: UniversePoint, viewMode: ViewMode) {
   if (viewMode === "clusters") {
-    return emotionColor(point.emotion);
+    return clusterColor(point.cluster);
   }
 
   const distance = Math.hypot(point.x - 50, point.y - 50, point.z - 50);
@@ -480,57 +499,16 @@ function pointColor(point: UniversePoint, viewMode: ViewMode) {
   return `hsl(${210 + intensity * 120} 90% ${72 - intensity * 24}%)`;
 }
 
-function buildClusterLabels(points: UniversePoint[]): ClusterLabel[] {
-  const grouped = new Map<
-    string,
-    {
-      label: string;
-      points: UniversePoint[];
-    }
-  >();
-
-  for (const point of points) {
-    if (point.cluster === -1) {
-      continue;
-    }
-
-    const label = point.emotion;
-    const key = label;
-    const group = grouped.get(key);
-
-    if (group) {
-      group.points.push(point);
-    } else {
-      grouped.set(key, { label, points: [point] });
-    }
+function clusterLabelText(point: UniversePoint) {
+  if (
+    point.archetypeName &&
+    point.archetypeName !== "Unknown" &&
+    point.archetypeName !== "Other / Unlabeled"
+  ) {
+    return point.archetypeName;
   }
 
-  return Array.from(grouped.entries())
-    .sort(([, a], [, b]) => {
-      return b.points.length - a.points.length;
-    })
-    .slice(0, 8)
-    .map(([id, group]) => {
-      const count = group.points.length;
-      const centroid = group.points.reduce(
-        (total, point) => ({
-          x: total.x + point.x,
-          y: total.y + point.y,
-          z: total.z + point.z,
-        }),
-        { x: 0, y: 0, z: 0 }
-      );
-      const representative = group.points[0];
-
-      return {
-        id,
-        label: group.label,
-        x: centroid.x / count,
-        y: centroid.y / count,
-        z: centroid.z / count,
-        color: emotionColor(representative.emotion),
-      };
-    });
+  return `Unlabeled Theme ${point.cluster}`;
 }
 
 function buildEmotionLegend(points: UniversePoint[], latest: LatestUniversePoint | null) {
@@ -560,6 +538,58 @@ function buildEmotionLegend(points: UniversePoint[], latest: LatestUniversePoint
   }
 
   return items;
+}
+
+function buildClusterLegend(points: UniversePoint[], latest: LatestUniversePoint | null) {
+  const clusters = new Map<number, { label: string; count: number; color: string }>();
+
+  for (const point of points) {
+    if (point.cluster === -1) {
+      continue;
+    }
+
+    const cluster = clusters.get(point.cluster);
+    if (cluster) {
+      cluster.count += 1;
+    } else {
+      clusters.set(point.cluster, {
+        label: clusterLabelText(point),
+        count: 1,
+        color: clusterColor(point.cluster),
+      });
+    }
+  }
+
+  const items: LegendItem[] = Array.from(clusters.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12)
+    .map((cluster) => ({
+      label: cluster.label,
+      color: cluster.color,
+    }));
+
+  if (points.some((point) => point.cluster === -1)) {
+    items.push({ label: "Unclustered", color: clusterColor(-1) });
+  }
+
+  if (latest) {
+    items.push({
+      label: `Your dream: cluster ${latest.cluster}`,
+      color: clusterColor(latest.cluster),
+    });
+  }
+
+  return items;
+}
+
+function buildUniverseLegend(
+  points: UniversePoint[],
+  latest: LatestUniversePoint | null,
+  viewMode: ViewMode
+) {
+  return viewMode === "clusters"
+    ? buildClusterLegend(points, latest)
+    : buildEmotionLegend(points, latest);
 }
 
 function emotionFilterLabel(filter: EmotionFilter, latest: LatestUniversePoint | null) {
@@ -606,6 +636,7 @@ export default function Home() {
   const [zoom, setZoom] = useState(1);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState(pipelineSteps[0].title);
   const [activeTheme, setActiveTheme] = useState<StoryTheme>("emotions");
   const [activeFutureWork, setActiveFutureWork] = useState<FutureWorkTheme>("archetypes");
@@ -703,10 +734,9 @@ export default function Home() {
     return samplePoints(focusedPoints, MAX_POINTS_BY_FOCUS[focusMode]);
   }, [emotionFilter, focusMode, latest, points]);
   const legendItems = useMemo(
-    () => buildEmotionLegend(renderedPoints, latest),
-    [renderedPoints, latest]
+    () => buildUniverseLegend(renderedPoints, latest, viewMode),
+    [renderedPoints, latest, viewMode]
   );
-  const clusterLabels = useMemo(() => buildClusterLabels(renderedPoints), [renderedPoints]);
   const visibleTotal = useMemo(() => {
     if (focusMode === "matched") {
       const matchedCluster = points.filter((point) => pointMatchesLatestCluster(point, latest));
@@ -724,7 +754,13 @@ export default function Home() {
 
   useEffect(() => {
     if (focusMode === "matched" && latest && visibleTotal === 0 && emotionFilter !== "mix") {
-      setEmotionFilter("mix");
+      const timer = window.setTimeout(() => {
+        setEmotionFilter("mix");
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timer);
+      };
     }
   }, [focusMode, latest, visibleTotal, emotionFilter]);
 
@@ -736,14 +772,22 @@ export default function Home() {
     () => matchedClusterSummary.reduce((total, [, count]) => total + count, 0),
     [matchedClusterSummary]
   );
+  const activePointId = hoveredPointId ?? selectedPointId;
   const selectedPoint = useMemo(() => {
-    if (selectedPointId === "latest-dream") {
+    if (activePointId === "latest-dream") {
       return latest;
     }
 
-    return points.find((point) => point.id === selectedPointId) ?? latest;
-  }, [latest, points, selectedPointId]);
+    return points.find((point) => point.id === activePointId) ?? latest;
+  }, [activePointId, latest, points]);
   const plottedPointCount = renderedPoints.length + (latest ? 1 : 0);
+  const visibleClusterCount = useMemo(() => {
+    return new Set(
+      renderedPoints
+        .filter((point) => point.cluster !== -1)
+        .map((point) => point.cluster)
+    ).size;
+  }, [renderedPoints]);
   const rotatedLatest = latest
     ? rotatePlanarPosition(latest.x, latest.y, rotation.z)
     : null;
@@ -910,7 +954,7 @@ export default function Home() {
                   className={viewMode === "clusters" ? "viz-pill active" : "viz-pill"}
                   onClick={() => setViewMode("clusters")}
                 >
-                  Emotion Colors
+                  Cluster Colors
                 </button>
                 <button
                   className={viewMode === "salience" ? "viz-pill active" : "viz-pill"}
@@ -1067,8 +1111,12 @@ export default function Home() {
                               : "universe-point"
                           }
                           onPointerDown={(event) => event.stopPropagation()}
+                          onPointerEnter={() => setHoveredPointId(point.id)}
+                          onPointerLeave={() => setHoveredPointId(null)}
+                          onFocus={() => setHoveredPointId(point.id)}
+                          onBlur={() => setHoveredPointId(null)}
                           onClick={() => setSelectedPointId(point.id)}
-                          title={`${point.emotion} emotion / cluster ${point.cluster}: ${point.hoverText}`}
+                          title={`${clusterLabelText(point)} / cluster ${point.cluster} / ${point.emotion}: ${point.hoverText}`}
                           style={
                             {
                               "--point-x": `${rotatedPoint.x * 5}px`,
@@ -1086,41 +1134,23 @@ export default function Home() {
                       );
                     })}
 
-                  {universeStatus === "ready" &&
-                    clusterLabels.map((label) => {
-                      const rotatedLabel = rotatePlanarPosition(label.x, label.y, rotation.z);
-
-                      return (
-                        <span
-                          key={label.id}
-                          className="universe-cluster-label"
-                          style={
-                            {
-                              "--label-x": `${rotatedLabel.x * 5}px`,
-                              "--label-y": `${rotatedLabel.y * 3.5}px`,
-                              "--label-z": `${(label.z - 50) * 5}px`,
-                              "--label-color": label.color,
-                            } as CSSProperties
-                          }
-                        >
-                          {label.label}
-                        </span>
-                      );
-                    })}
-
                   {latest && rotatedLatest && (
                     <button
                       type="button"
                       className="universe-latest-point"
                       onPointerDown={(event) => event.stopPropagation()}
+                      onPointerEnter={() => setHoveredPointId("latest-dream")}
+                      onPointerLeave={() => setHoveredPointId(null)}
+                      onFocus={() => setHoveredPointId("latest-dream")}
+                      onBlur={() => setHoveredPointId(null)}
                       onClick={() => setSelectedPointId("latest-dream")}
-                      title={`Your latest dream / ${latest.emotion} / cluster ${latest.cluster}: ${latest.hoverText}`}
+                      title={`Your latest dream / ${clusterLabelText(latest)} / cluster ${latest.cluster} / ${latest.emotion}: ${latest.hoverText}`}
                       style={
                         {
                           "--point-x": `${rotatedLatest.x * 5}px`,
                           "--point-y": `${rotatedLatest.y * 3.5}px`,
                           "--point-z": `${(latest.z - 50) * 5}px`,
-                          "--point-color": emotionColor(latest.emotion),
+                          "--point-color": pointColor(latest, viewMode),
                         } as CSSProperties
                       }
                       aria-label={`Your latest dream, ${latest.emotion}, cluster ${latest.cluster}`}
@@ -1140,7 +1170,8 @@ export default function Home() {
               )}
               {universeStatus === "ready" && (
                 <p className="universe-status">
-                  Plotting {plottedPointCount} markers from {visibleTotal}
+                  Plotting {plottedPointCount} markers across {visibleClusterCount} visible
+                  clusters from {visibleTotal}
                   {focusMode === "matched" && latest
                         ? emotionFilter === "mix"
                           ? ` dataset dreams across all emotions in cluster ${latest.cluster}.`
@@ -1208,11 +1239,15 @@ export default function Home() {
               {selectedPoint && (
                 <div className="universe-inspector">
                   <p className="universe-inspector-kicker">
-                    {selectedPoint.id === "latest-dream" ? "Your Latest Dream" : "Selected Dream"}
+                    {selectedPoint.id === "latest-dream"
+                      ? "Your Latest Dream"
+                      : hoveredPointId
+                        ? "Hovered Dream"
+                        : "Selected Dream"}
                   </p>
                   <p>
-                    <b>{selectedPoint.emotion}</b>
-                    {` / cluster ${selectedPoint.cluster}`}
+                    <b>{clusterLabelText(selectedPoint)}</b>
+                    {` / cluster ${selectedPoint.cluster} / ${selectedPoint.emotion}`}
                   </p>
                   <p>{selectedPoint.hoverText}</p>
                 </div>
