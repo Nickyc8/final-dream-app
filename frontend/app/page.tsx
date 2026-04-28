@@ -50,6 +50,7 @@ type LatestUniversePoint = UniversePoint;
 type LegendItem = {
   label: string;
   color: string;
+  cluster?: number;
 };
 
 type DragState = {
@@ -566,7 +567,10 @@ function buildEmotionLegend(points: UniversePoint[], latest: LatestUniversePoint
 }
 
 function buildClusterLegend(points: UniversePoint[], latest: LatestUniversePoint | null) {
-  const clusters = new Map<string, { label: string; count: number; color: string }>();
+  const clusters = new Map<
+    number,
+    { label: string; count: number; color: string; cluster: number }
+  >();
 
   for (const point of points) {
     if (point.cluster === -1) {
@@ -574,14 +578,15 @@ function buildClusterLegend(points: UniversePoint[], latest: LatestUniversePoint
     }
 
     const label = clusterLabelText(point);
-    const cluster = clusters.get(label);
+    const cluster = clusters.get(point.cluster);
     if (cluster) {
       cluster.count += 1;
     } else {
-      clusters.set(label, {
-        label,
+      clusters.set(point.cluster, {
+        label: `Cluster ${point.cluster}: ${label}`,
         count: 1,
         color: clusterGroupColor(label),
+        cluster: point.cluster,
       });
     }
   }
@@ -592,17 +597,19 @@ function buildClusterLegend(points: UniversePoint[], latest: LatestUniversePoint
     .map((cluster) => ({
       label: cluster.label,
       color: cluster.color,
+      cluster: cluster.cluster,
     }));
 
   if (points.some((point) => point.cluster === -1)) {
-    items.push({ label: "Unclustered", color: clusterColor(-1) });
+    items.push({ label: "Unclustered", color: clusterColor(-1), cluster: -1 });
   }
 
   if (latest) {
     const latestLabel = clusterLabelText(latest);
     items.push({
-      label: `Your dream: ${latestLabel}`,
+      label: `Your dream: cluster ${latest.cluster} (${latestLabel})`,
       color: latest.cluster === -1 ? clusterColor(-1) : clusterGroupColor(latestLabel),
+      cluster: latest.cluster,
     });
   }
 
@@ -664,6 +671,12 @@ export default function Home() {
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<number | null>(null);
+  const [clusterSearchValue, setClusterSearchValue] = useState("");
+  const [clusterSearchError, setClusterSearchError] = useState("");
+  const [selectedClusterName, setSelectedClusterName] = useState<string | null>(null);
+  const [clusterNameSearchValue, setClusterNameSearchValue] = useState("");
+  const [clusterNameSearchError, setClusterNameSearchError] = useState("");
   const [activeStep, setActiveStep] = useState(pipelineSteps[0].title);
   const [activeTheme, setActiveTheme] = useState<StoryTheme>("emotions");
   const [activeFutureWork, setActiveFutureWork] = useState<FutureWorkTheme>("archetypes");
@@ -744,7 +757,82 @@ export default function Home() {
     () => normalizeUniversePoints(rawPoints, latestDream),
     [rawPoints, latestDream]
   );
+  const availableClusters = useMemo(() => {
+    const unique = new Set<number>();
+    for (const point of points) {
+      unique.add(point.cluster);
+    }
+    return Array.from(unique).sort((a, b) => a - b);
+  }, [points]);
+  const clusterSuggestions = useMemo(
+    () => availableClusters.slice(0, 200),
+    [availableClusters]
+  );
+  const availableClusterNames = useMemo(() => {
+    const unique = new Map<string, string>();
+    for (const point of points) {
+      const label = point.archetypeName?.trim() || "Unknown";
+      const key = label.toLowerCase();
+      if (!unique.has(key)) {
+        unique.set(key, label);
+      }
+    }
+    return Array.from(unique.values()).sort((a, b) => a.localeCompare(b));
+  }, [points]);
+  const clusterNameSuggestions = useMemo(
+    () => availableClusterNames.slice(0, 200),
+    [availableClusterNames]
+  );
+  const selectedClusterNameKey = useMemo(
+    () => (selectedClusterName ? selectedClusterName.toLowerCase() : null),
+    [selectedClusterName]
+  );
+  const selectedClusterNameClusters = useMemo(() => {
+    if (!selectedClusterNameKey) {
+      return [];
+    }
+    const unique = new Set<number>();
+    for (const point of points) {
+      if (point.archetypeName?.toLowerCase() === selectedClusterNameKey) {
+        unique.add(point.cluster);
+      }
+    }
+    return Array.from(unique).sort((a, b) => a - b);
+  }, [points, selectedClusterNameKey]);
+  const selectedClusterNameDetail = useMemo(() => {
+    if (!selectedClusterNameKey) {
+      return null;
+    }
+    if (selectedClusterNameClusters.length === 0) {
+      return null;
+    }
+    if (selectedClusterNameClusters.length <= 6) {
+      return `Clusters ${selectedClusterNameClusters.join(", ")}`;
+    }
+    return `${selectedClusterNameClusters.length} clusters`;
+  }, [selectedClusterNameClusters, selectedClusterNameKey]);
+  const selectedClusterLabel = useMemo(() => {
+    if (selectedCluster === null) {
+      return null;
+    }
+    if (selectedCluster === -1) {
+      return "Unclustered";
+    }
+    const match = points.find((point) => point.cluster === selectedCluster);
+    return match
+      ? `Cluster ${selectedCluster}: ${clusterLabelText(match)}`
+      : `Cluster ${selectedCluster}`;
+  }, [points, selectedCluster]);
   const renderedPoints = useMemo(() => {
+    if (selectedClusterNameKey) {
+      return points.filter(
+        (point) => point.archetypeName?.toLowerCase() === selectedClusterNameKey
+      );
+    }
+    if (selectedCluster !== null) {
+      return points.filter((point) => point.cluster === selectedCluster);
+    }
+
     let focusedPoints =
       focusMode === "matched"
         ? points.filter((point) => pointMatchesLatestCluster(point, latest))
@@ -759,12 +847,21 @@ export default function Home() {
     }
 
     return samplePoints(focusedPoints, MAX_POINTS_BY_FOCUS[focusMode]);
-  }, [emotionFilter, focusMode, latest, points]);
-  const legendItems = useMemo(
-    () => buildUniverseLegend(renderedPoints, latest, viewMode),
-    [renderedPoints, latest, viewMode]
-  );
+  }, [emotionFilter, focusMode, latest, points, selectedCluster, selectedClusterNameKey]);
+  const legendItems = useMemo(() => {
+    const legendPoints =
+      selectedCluster !== null || selectedClusterNameKey ? points : renderedPoints;
+    return buildUniverseLegend(legendPoints, latest, viewMode);
+  }, [latest, points, renderedPoints, selectedCluster, selectedClusterNameKey, viewMode]);
   const visibleTotal = useMemo(() => {
+    if (selectedClusterNameKey) {
+      return points.filter(
+        (point) => point.archetypeName?.toLowerCase() === selectedClusterNameKey
+      ).length;
+    }
+    if (selectedCluster !== null) {
+      return points.filter((point) => point.cluster === selectedCluster).length;
+    }
     if (focusMode === "matched") {
       const matchedCluster = points.filter((point) => pointMatchesLatestCluster(point, latest));
       if (emotionFilter === "matched") {
@@ -777,9 +874,12 @@ export default function Home() {
     }
 
     return points.filter((point) => pointMatchesFocus(point, focusMode)).length;
-  }, [emotionFilter, focusMode, latest, points]);
+  }, [emotionFilter, focusMode, latest, points, selectedCluster, selectedClusterNameKey]);
 
   useEffect(() => {
+    if (selectedCluster !== null || selectedClusterNameKey) {
+      return;
+    }
     if (focusMode === "matched" && latest && visibleTotal === 0 && emotionFilter !== "mix") {
       const timer = window.setTimeout(() => {
         setEmotionFilter("mix");
@@ -789,7 +889,7 @@ export default function Home() {
         window.clearTimeout(timer);
       };
     }
-  }, [focusMode, latest, visibleTotal, emotionFilter]);
+  }, [focusMode, latest, visibleTotal, emotionFilter, selectedCluster, selectedClusterNameKey]);
 
   const matchedClusterSummary = useMemo(
     () => buildMatchedClusterSummary(points, latest),
@@ -809,12 +909,22 @@ export default function Home() {
   }, [activePointId, latest, points]);
   const plottedPointCount = renderedPoints.length + (latest ? 1 : 0);
   const visibleClusterCount = useMemo(() => {
+    if (selectedClusterNameKey) {
+      return new Set(
+        points
+          .filter((point) => point.archetypeName?.toLowerCase() === selectedClusterNameKey)
+          .map((point) => point.cluster)
+      ).size;
+    }
+    if (selectedCluster !== null) {
+      return 1;
+    }
     return new Set(
       renderedPoints
         .filter((point) => point.cluster !== -1)
         .map((point) => clusterLabelText(point))
     ).size;
-  }, [renderedPoints]);
+  }, [points, renderedPoints, selectedCluster, selectedClusterNameKey]);
   const projectedLatest = latest ? projectUniversePoint(latest, rotation, zoom) : null;
   const stepDetail =
     pipelineSteps.find((step) => step.title === activeStep) ?? pipelineSteps[0];
@@ -853,6 +963,89 @@ export default function Home() {
     if (dragState?.pointerId === event.pointerId) {
       setDragState(null);
     }
+  }
+
+  function applyClusterSelection(clusterText: string) {
+    const trimmed = clusterText.trim();
+    if (!trimmed) {
+      setSelectedCluster(null);
+      setClusterSearchError("");
+      return;
+    }
+
+    const parsed = Number.parseInt(trimmed, 10);
+    if (Number.isNaN(parsed)) {
+      setClusterSearchError("Enter a valid cluster number.");
+      return;
+    }
+
+    if (availableClusters.length > 0 && !availableClusters.includes(parsed)) {
+      setClusterSearchError("Cluster not found.");
+      return;
+    }
+
+    setClusterSearchError("");
+    setSelectedCluster(parsed);
+    setSelectedClusterName(null);
+    setClusterNameSearchValue("");
+    setClusterNameSearchError("");
+  }
+
+  function handleClusterSearchSubmit() {
+    applyClusterSelection(clusterSearchValue);
+  }
+
+  function handleClusterSearchClear() {
+    setSelectedCluster(null);
+    setClusterSearchValue("");
+    setClusterSearchError("");
+  }
+
+  function applyClusterNameSelection(nameText: string) {
+    const trimmed = nameText.trim();
+    if (!trimmed) {
+      setSelectedClusterName(null);
+      setClusterNameSearchError("");
+      return;
+    }
+
+    const normalized = trimmed.toLowerCase();
+    const match = availableClusterNames.find(
+      (name) => name.toLowerCase() === normalized
+    );
+    if (!match) {
+      setClusterNameSearchError("Cluster name not found.");
+      return;
+    }
+
+    setClusterNameSearchError("");
+    setSelectedClusterName(match);
+    setClusterNameSearchValue(match);
+    setSelectedCluster(null);
+    setClusterSearchValue("");
+    setClusterSearchError("");
+  }
+
+  function handleClusterNameSearchSubmit() {
+    applyClusterNameSelection(clusterNameSearchValue);
+  }
+
+  function handleClusterNameSearchClear() {
+    setSelectedClusterName(null);
+    setClusterNameSearchValue("");
+    setClusterNameSearchError("");
+  }
+
+  function handleClusterLegendClick(cluster: number) {
+    setSelectedCluster((current) => {
+      const next = current === cluster ? null : cluster;
+      setClusterSearchValue(next === null ? "" : String(next));
+      setClusterSearchError("");
+      setSelectedClusterName(null);
+      setClusterNameSearchValue("");
+      setClusterNameSearchError("");
+      return next;
+    });
   }
 
   function handleUniverseWheel(event: WheelEvent<HTMLDivElement>) {
@@ -1003,7 +1196,110 @@ export default function Home() {
                 ))}
               </div>
 
-              {latest && focusMode === "matched" && (
+              <div className="control-group cluster-filter-group">
+                <span>Cluster:</span>
+                <div className="cluster-filter">
+                  <input
+                    className="cluster-input"
+                    type="number"
+                    inputMode="numeric"
+                    list="cluster-options"
+                    placeholder="Enter cluster #"
+                    value={clusterSearchValue}
+                    onChange={(event) => {
+                      setClusterSearchValue(event.target.value);
+                      if (clusterSearchError) {
+                        setClusterSearchError("");
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleClusterSearchSubmit();
+                      }
+                    }}
+                    aria-label="Filter by cluster number"
+                  />
+                  <datalist id="cluster-options">
+                    {clusterSuggestions.map((cluster) => (
+                      <option key={cluster} value={cluster} />
+                    ))}
+                  </datalist>
+                  <button
+                    type="button"
+                    className="viz-pill"
+                    onClick={handleClusterSearchSubmit}
+                  >
+                    Show
+                  </button>
+                  <button
+                    type="button"
+                    className="viz-pill"
+                    onClick={handleClusterSearchClear}
+                    disabled={selectedCluster === null && !clusterSearchValue}
+                  >
+                    Clear
+                  </button>
+                </div>
+                {clusterSearchError && (
+                  <span className="cluster-filter-error" role="status">
+                    {clusterSearchError}
+                  </span>
+                )}
+              </div>
+
+              <div className="control-group cluster-filter-group">
+                <span>Cluster Name:</span>
+                <div className="cluster-filter">
+                  <input
+                    className="cluster-input"
+                    type="text"
+                    list="cluster-name-options"
+                    placeholder="Search name"
+                    value={clusterNameSearchValue}
+                    onChange={(event) => {
+                      setClusterNameSearchValue(event.target.value);
+                      if (clusterNameSearchError) {
+                        setClusterNameSearchError("");
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleClusterNameSearchSubmit();
+                      }
+                    }}
+                    aria-label="Filter by cluster name"
+                  />
+                  <datalist id="cluster-name-options">
+                    {clusterNameSuggestions.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                  <button
+                    type="button"
+                    className="viz-pill"
+                    onClick={handleClusterNameSearchSubmit}
+                  >
+                    Show
+                  </button>
+                  <button
+                    type="button"
+                    className="viz-pill"
+                    onClick={handleClusterNameSearchClear}
+                    disabled={selectedClusterName === null && !clusterNameSearchValue}
+                  >
+                    Clear
+                  </button>
+                </div>
+                {clusterNameSearchError && (
+                  <span className="cluster-filter-error" role="status">
+                    {clusterNameSearchError}
+                  </span>
+                )}
+              </div>
+
+              {latest && focusMode === "matched" && selectedCluster === null && !selectedClusterNameKey && (
                 <div className="control-group emotion-filter-group">
                   <span>Emotion:</span>
                   {(["matched", "mix", ...EMOTION_OPTIONS] as EmotionFilter[]).map((filter) => (
@@ -1025,7 +1321,18 @@ export default function Home() {
                 <p>
                   <b>Focus:</b> {focusDescription(focusMode, latest)}
                 </p>
-                {latest && focusMode === "matched" && (
+                {selectedClusterNameKey && (
+                  <p>
+                    <b>Cluster Name:</b> {selectedClusterName}
+                    {selectedClusterNameDetail ? ` (${selectedClusterNameDetail})` : "."}
+                  </p>
+                )}
+                {selectedCluster !== null && (
+                  <p>
+                    <b>Cluster:</b> Showing {selectedClusterLabel ?? `cluster ${selectedCluster}`}.
+                  </p>
+                )}
+                {latest && focusMode === "matched" && selectedCluster === null && !selectedClusterNameKey && (
                   <p>
                     <b>Emotion:</b> {emotionFilterDescription(emotionFilter, latest)}
                   </p>
@@ -1210,16 +1517,26 @@ export default function Home() {
               )}
               {universeStatus === "ready" && (
                 <p className="universe-status">
-                  Plotting {plottedPointCount} markers across {visibleClusterCount} visible
-                  clusters from {visibleTotal}
-                  {focusMode === "matched" && latest
+                  {selectedClusterNameKey ? (
+                    `Plotting ${plottedPointCount} markers from ${visibleTotal} dreams across ${visibleClusterCount} clusters in ${selectedClusterName}.`
+                  ) : selectedCluster !== null ? (
+                    `Plotting ${plottedPointCount} markers from ${visibleTotal} dreams in ${
+                      selectedClusterLabel ?? `cluster ${selectedCluster}`
+                    }.`
+                  ) : (
+                    <>
+                      Plotting {plottedPointCount} markers across {visibleClusterCount} visible
+                      clusters from {visibleTotal}
+                      {focusMode === "matched" && latest
                         ? emotionFilter === "mix"
                           ? ` dataset dreams across all emotions in cluster ${latest.cluster}.`
                           : ` ${emotionFilterStatusLabel(emotionFilter, latest)} dataset dreams in cluster ${latest.cluster}.`
                         : " dreams across the full universe."}
+                    </>
+                  )}
                 </p>
               )}
-              {focusMode === "matched" && latest && matchedClusterSummary.length > 0 && (
+              {focusMode === "matched" && latest && matchedClusterSummary.length > 0 && selectedCluster === null && !selectedClusterNameKey && (
                 <div className="emotion-mix" aria-label="Emotion mix in matched cluster">
                   <div className="emotion-mix-head">
                     <p>Emotion Mix In Cluster {latest.cluster}</p>
@@ -1265,15 +1582,50 @@ export default function Home() {
               )}
               {legendItems.length > 0 && (
                 <div className="universe-legend" aria-label="Dream universe color key">
-                  {legendItems.map((item, index) => (
-                    <span className="universe-legend-item" key={`${item.label}-${item.color}-${index}`}>
-                      <span
-                        className="universe-legend-swatch"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      {item.label}
-                    </span>
-                  ))}
+                  {legendItems.map((item, index) => {
+                    const clusterId = item.cluster;
+                    const isClusterItem =
+                      viewMode === "clusters" && typeof clusterId === "number";
+                    const isActive = isClusterItem && selectedCluster === clusterId;
+                    const key = `${item.label}-${item.color}-${index}`;
+
+                    if (isClusterItem && clusterId !== undefined) {
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={
+                            isActive
+                              ? "universe-legend-item is-clickable is-active"
+                              : "universe-legend-item is-clickable"
+                          }
+                          onClick={() => handleClusterLegendClick(clusterId)}
+                          aria-pressed={isActive}
+                          title={
+                            isActive
+                              ? "Clear cluster filter"
+                              : `Show all dreams in ${item.label}`
+                          }
+                        >
+                          <span
+                            className="universe-legend-swatch"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          {item.label}
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <span className="universe-legend-item" key={key}>
+                        <span
+                          className="universe-legend-swatch"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        {item.label}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>

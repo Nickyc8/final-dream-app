@@ -613,11 +613,119 @@ body {
   padding: 0.28rem 0.48rem;
 }
 
+.universe-legend-item.is-clickable {
+  cursor: pointer;
+  font: inherit;
+  appearance: none;
+}
+
+.universe-legend-item.is-clickable:hover,
+.universe-legend-item.is-clickable:focus-visible {
+  border-color: rgba(147, 242, 231, 0.55);
+  background: rgba(147, 242, 231, 0.1);
+  outline: none;
+}
+
+.universe-legend-item.is-active {
+  border-color: rgba(147, 242, 231, 0.75);
+  box-shadow: 0 0 0 1px rgba(147, 242, 231, 0.4);
+}
+
+.universe-legend-item.is-clickable {
+  cursor: pointer;
+  font: inherit;
+  appearance: none;
+}
+
+.universe-legend-item.is-clickable:hover,
+.universe-legend-item.is-clickable:focus-visible {
+  border-color: rgba(147, 242, 231, 0.55);
+  background: rgba(147, 242, 231, 0.1);
+  outline: none;
+}
+
+.universe-legend-item.is-active {
+  border-color: rgba(147, 242, 231, 0.75);
+  box-shadow: 0 0 0 1px rgba(147, 242, 231, 0.4);
+}
+
+.cluster-filter-group {
+  align-items: center;
+}
+
+.cluster-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cluster-input {
+  min-width: 8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #efe4ff;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.cluster-input::placeholder {
+  color: rgba(239, 228, 255, 0.6);
+}
+
+.cluster-input:focus-visible {
+  border-color: rgba(147, 242, 231, 0.65);
+  box-shadow: 0 0 0 2px rgba(147, 242, 231, 0.2);
+}
+
+.cluster-filter-error {
+  color: #ffd1df;
+  font-size: 0.72rem;
+}
+
 .universe-legend-swatch {
   width: 0.62rem;
   aspect-ratio: 1;
   border-radius: 999px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.cluster-filter-group {
+  align-items: center;
+}
+
+.cluster-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cluster-input {
+  min-width: 8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #efe4ff;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.cluster-input::placeholder {
+  color: rgba(239, 228, 255, 0.6);
+}
+
+.cluster-input:focus-visible {
+  border-color: rgba(147, 242, 231, 0.65);
+  box-shadow: 0 0 0 2px rgba(147, 242, 231, 0.2);
+}
+
+.cluster-filter-error {
+  color: #ffd1df;
+  font-size: 0.72rem;
 }
 
 .emotion-mix {
