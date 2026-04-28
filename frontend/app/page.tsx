@@ -414,6 +414,16 @@ function clusterColor(cluster: number) {
   return CLUSTER_COLORS[index];
 }
 
+function clusterGroupColor(label: string) {
+  let hash = 0;
+
+  for (let index = 0; index < label.length; index += 1) {
+    hash = (hash * 31 + label.charCodeAt(index)) % CLUSTER_COLORS.length;
+  }
+
+  return CLUSTER_COLORS[Math.abs(hash)];
+}
+
 function inferEmotionLabel(text: string, archetypeName: string) {
   const archetypeEmotion = ARCHETYPE_EMOTIONS[archetypeName];
   if (archetypeEmotion) {
@@ -506,7 +516,7 @@ function normalizeUniversePoints(
 
 function pointColor(point: UniversePoint, viewMode: ViewMode) {
   if (viewMode === "clusters") {
-    return clusterColor(point.cluster);
+    return point.cluster === -1 ? clusterColor(-1) : clusterGroupColor(clusterLabelText(point));
   }
 
   const distance = Math.hypot(point.x - 50, point.y - 50, point.z - 50);
@@ -556,21 +566,22 @@ function buildEmotionLegend(points: UniversePoint[], latest: LatestUniversePoint
 }
 
 function buildClusterLegend(points: UniversePoint[], latest: LatestUniversePoint | null) {
-  const clusters = new Map<number, { label: string; count: number; color: string }>();
+  const clusters = new Map<string, { label: string; count: number; color: string }>();
 
   for (const point of points) {
     if (point.cluster === -1) {
       continue;
     }
 
-    const cluster = clusters.get(point.cluster);
+    const label = clusterLabelText(point);
+    const cluster = clusters.get(label);
     if (cluster) {
       cluster.count += 1;
     } else {
-      clusters.set(point.cluster, {
-        label: clusterLabelText(point),
+      clusters.set(label, {
+        label,
         count: 1,
-        color: clusterColor(point.cluster),
+        color: clusterGroupColor(label),
       });
     }
   }
@@ -588,9 +599,10 @@ function buildClusterLegend(points: UniversePoint[], latest: LatestUniversePoint
   }
 
   if (latest) {
+    const latestLabel = clusterLabelText(latest);
     items.push({
-      label: `Your dream: cluster ${latest.cluster}`,
-      color: clusterColor(latest.cluster),
+      label: `Your dream: ${latestLabel}`,
+      color: latest.cluster === -1 ? clusterColor(-1) : clusterGroupColor(latestLabel),
     });
   }
 
@@ -800,7 +812,7 @@ export default function Home() {
     return new Set(
       renderedPoints
         .filter((point) => point.cluster !== -1)
-        .map((point) => point.cluster)
+        .map((point) => clusterLabelText(point))
     ).size;
   }, [renderedPoints]);
   const projectedLatest = latest ? projectUniversePoint(latest, rotation, zoom) : null;
