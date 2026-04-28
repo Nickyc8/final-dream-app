@@ -386,6 +386,21 @@ function rotatePlanarPosition(x: number, y: number, rotationDegrees: number) {
   };
 }
 
+function projectUniversePoint(point: UniversePoint, rotation: { x: number; z: number }, zoom: number) {
+  const rotatedPoint = rotatePlanarPosition(point.x, point.y, rotation.z);
+  const z = (point.z - 50) * 5;
+  const tilt = (rotation.x * Math.PI) / 180;
+  const y = rotatedPoint.y * 3.5;
+  const projectedY = y * Math.cos(tilt) - z * Math.sin(tilt);
+  const depth = y * Math.sin(tilt) + z * Math.cos(tilt);
+
+  return {
+    x: rotatedPoint.x * 5 * zoom,
+    y: projectedY * zoom,
+    depth,
+  };
+}
+
 function emotionColor(emotion: string) {
   return EMOTION_COLORS[emotion] ?? EMOTION_COLORS["Mixed / reflective"];
 }
@@ -788,9 +803,7 @@ export default function Home() {
         .map((point) => point.cluster)
     ).size;
   }, [renderedPoints]);
-  const rotatedLatest = latest
-    ? rotatePlanarPosition(latest.x, latest.y, rotation.z)
-    : null;
+  const projectedLatest = latest ? projectUniversePoint(latest, rotation, zoom) : null;
   const stepDetail =
     pipelineSteps.find((step) => step.title === activeStep) ?? pipelineSteps[0];
 
@@ -1093,13 +1106,14 @@ export default function Home() {
                   <div className="universe-plane universe-plane-x" />
                   <div className="universe-plane universe-plane-y" />
                   <div className="universe-plane universe-plane-z" />
-
+                </div>
+                <div className="universe-points-layer">
                   {universeStatus === "ready" &&
                     renderedPoints.map((point) => {
                       const isSelected = selectedPointId === point.id;
                       const size = point.cluster === -1 ? 4 : 5.5 + point.z / 24;
                       const opacity = point.cluster === -1 ? 0.32 : 0.76;
-                      const rotatedPoint = rotatePlanarPosition(point.x, point.y, rotation.z);
+                      const projectedPoint = projectUniversePoint(point, rotation, zoom);
 
                       return (
                         <button
@@ -1119,9 +1133,8 @@ export default function Home() {
                           title={`${clusterLabelText(point)} / cluster ${point.cluster} / ${point.emotion}: ${point.hoverText}`}
                           style={
                             {
-                              "--point-x": `${rotatedPoint.x * 5}px`,
-                              "--point-y": `${rotatedPoint.y * 3.5}px`,
-                              "--point-z": `${(point.z - 50) * 5}px`,
+                              "--point-screen-x": `${projectedPoint.x}px`,
+                              "--point-screen-y": `${projectedPoint.y}px`,
                               "--point-size": `${size}px`,
                               "--point-color": pointColor(point, viewMode),
                               "--point-opacity": opacity,
@@ -1134,7 +1147,7 @@ export default function Home() {
                       );
                     })}
 
-                  {latest && rotatedLatest && (
+                  {latest && projectedLatest && (
                     <button
                       type="button"
                       className="universe-latest-point"
@@ -1147,9 +1160,8 @@ export default function Home() {
                       title={`Your latest dream / ${clusterLabelText(latest)} / cluster ${latest.cluster} / ${latest.emotion}: ${latest.hoverText}`}
                       style={
                         {
-                          "--point-x": `${rotatedLatest.x * 5}px`,
-                          "--point-y": `${rotatedLatest.y * 3.5}px`,
-                          "--point-z": `${(latest.z - 50) * 5}px`,
+                          "--point-screen-x": `${projectedLatest.x}px`,
+                          "--point-screen-y": `${projectedLatest.y}px`,
                           "--point-color": pointColor(latest, viewMode),
                         } as CSSProperties
                       }
@@ -1159,6 +1171,22 @@ export default function Home() {
                     </button>
                   )}
                 </div>
+                {selectedPoint && (
+                  <div className="universe-inspector">
+                    <p className="universe-inspector-kicker">
+                      {selectedPoint.id === "latest-dream"
+                        ? "Your Latest Dream"
+                        : hoveredPointId
+                          ? "Hovered Dream"
+                          : "Selected Dream"}
+                    </p>
+                    <p>
+                      <b>{clusterLabelText(selectedPoint)}</b>
+                      {` / cluster ${selectedPoint.cluster} / ${selectedPoint.emotion}`}
+                    </p>
+                    <p className="universe-inspector-preview">{selectedPoint.hoverText}</p>
+                  </div>
+                )}
               </div>
               {universeStatus === "loading" && (
                 <p className="universe-status">Loading backend universe...</p>
@@ -1225,8 +1253,8 @@ export default function Home() {
               )}
               {legendItems.length > 0 && (
                 <div className="universe-legend" aria-label="Dream universe color key">
-                  {legendItems.map((item) => (
-                    <span className="universe-legend-item" key={item.label}>
+                  {legendItems.map((item, index) => (
+                    <span className="universe-legend-item" key={`${item.label}-${item.color}-${index}`}>
                       <span
                         className="universe-legend-swatch"
                         style={{ backgroundColor: item.color }}
@@ -1236,28 +1264,11 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              {selectedPoint && (
-                <div className="universe-inspector">
-                  <p className="universe-inspector-kicker">
-                    {selectedPoint.id === "latest-dream"
-                      ? "Your Latest Dream"
-                      : hoveredPointId
-                        ? "Hovered Dream"
-                        : "Selected Dream"}
-                  </p>
-                  <p>
-                    <b>{clusterLabelText(selectedPoint)}</b>
-                    {` / cluster ${selectedPoint.cluster} / ${selectedPoint.emotion}`}
-                  </p>
-                  <p>{selectedPoint.hoverText}</p>
-                </div>
-              )}
             </div>
 
             <p className="viz-footnote">
               Drag the universe to rotate the real 3D backend projection, scroll to
-              zoom. Labels mark the visible clusters; click any point to inspect an
-              example dream.
+              zoom. Hover or click any point to inspect an example dream.
             </p>
           </article>
 

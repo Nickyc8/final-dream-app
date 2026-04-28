@@ -466,6 +466,12 @@ body {
   transition: transform 280ms ease;
 }
 
+.universe-points-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .universe-plane {
   position: absolute;
   left: 50%;
@@ -507,9 +513,8 @@ body {
     0 0 0 1px rgba(255, 255, 255, 0.18),
     0 0 12px color-mix(in srgb, var(--point-color), transparent 48%);
   transform:
-    translate3d(var(--point-x), var(--point-y), var(--point-z))
+    translate(var(--point-screen-x), var(--point-screen-y))
     translate(-50%, -50%);
-  transform-style: preserve-3d;
   transition:
     opacity 160ms ease,
     box-shadow 160ms ease,
@@ -523,6 +528,7 @@ body {
   background: transparent;
   opacity: 1;
   box-shadow: none;
+  pointer-events: auto;
 }
 
 .universe-point-core {
@@ -560,6 +566,7 @@ body {
   opacity: 1;
   background: transparent;
   border: 1px solid var(--point-color);
+  pointer-events: auto;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.5),
     0 0 24px var(--point-color);
@@ -709,11 +716,19 @@ body {
 }
 
 .universe-inspector {
-  margin-top: 0.72rem;
+  position: absolute;
+  left: 0.8rem;
+  right: 0.8rem;
+  bottom: 0.8rem;
+  z-index: 3;
+  max-width: min(34rem, calc(100% - 1.6rem));
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
-  background: rgba(4, 2, 14, 0.58);
+  background: rgba(4, 2, 14, 0.82);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.36);
+  overflow: hidden;
   padding: 0.72rem;
+  pointer-events: none;
 }
 
 .universe-inspector p {
@@ -732,6 +747,13 @@ body {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.universe-inspector-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .pipeline-buttons {
